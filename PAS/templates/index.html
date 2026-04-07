@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>PAS</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+<div class="container py-5">
+  <h1 class="text-center mb-4">🧑‍⚕️ Patient Appointment System</h1>
+
+  <div class="card shadow p-4 mb-4">
+    <input id="patient_name" class="form-control mb-2" placeholder="Patient Name">
+    <select id="doctor_select" class="form-select mb-2"></select>
+    <select id="slot_select" class="form-select mb-2"></select>
+    <button class="btn btn-primary" onclick="bookAppointment()">Book Appointment</button>
+  </div>
+
+  <div class="card shadow p-4">
+    <button class="btn btn-dark mb-3" onclick="loadAppointments()">Refresh</button>
+    <table class="table">
+      <thead><tr><th>Patient</th><th>Doctor</th><th>Date</th><th>Time</th><th></th></tr></thead>
+      <tbody id="appointments_table"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+function loadDoctors(){
+ fetch('/doctors').then(r=>r.json()).then(data=>{
+   let s=doctor_select;
+   s.innerHTML='';
+   data.forEach(d=> s.innerHTML += `<option value="${d.id}">${d.name}</option>`);
+   loadSlots();
+ });
+}
+
+function loadSlots(){
+ fetch(`/doctor/${doctor_select.value}`)
+ .then(r=>r.json())
+ .then(data=>{
+   slot_select.innerHTML='';
+   data.availability.filter(s=>!s.is_booked).forEach(slot=>{
+     slot_select.innerHTML += `<option value="${slot.date}|${slot.time_slot}">${slot.date} - ${slot.time_slot}</option>`;
+   });
+ });
+}
+
+doctor_select.addEventListener('change', loadSlots);
+
+function bookAppointment(){
+ let [date,time_slot]=slot_select.value.split('|');
+ let doctor_name=doctor_select.options[doctor_select.selectedIndex].text;
+
+ fetch('/appointment',{
+   method:'POST',
+   headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({
+     patient_name:patient_name.value,
+     doctor_id:doctor_select.value,
+     doctor_name,
+     date,
+     time_slot
+   })
+ }).then(r=>r.json()).then(d=>{
+   alert(d.message || d.error);
+   loadAppointments();
+   loadSlots();
+ })
+}
+
+function loadAppointments(){
+ fetch('/appointments').then(r=>r.json()).then(data=>{
+   appointments_table.innerHTML='';
+   data.forEach(a=>{
+     appointments_table.innerHTML += `
+     <tr>
+       <td>${a.patient_name}</td>
+       <td>${a.doctor_name}</td>
+       <td>${a.date}</td>
+       <td>${a.time_slot}</td>
+       <td><button class="btn btn-danger btn-sm" onclick="cancelAppt(${a.id})">Cancel</button></td>
+     </tr>`;
+   });
+ });
+}
+
+function cancelAppt(id){
+ fetch(`/appointment/${id}`,{method:'DELETE'})
+ .then(r=>r.json())
+ .then(d=>{
+   alert(d.message);
+   loadAppointments();
+   loadSlots();
+ });
+}
+
+loadDoctors();
+loadAppointments();
+</script>
+</body>
+</html>
